@@ -1,0 +1,2 @@
+original_records,processed_records,removed_records,text_column,category_column,cleaned_column,priority_high,priority_medium,priority_low
+8469,8469,0,Ticket Description,Ticket Type,Ticket Description_cleaned,0,0,8469

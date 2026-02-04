@@ -1,0 +1,2 @@
+total_tickets,num_categories,avg_word_count,missing_values,duplicates,text_column,category_column
+8469,5,46.46735151729838,19919,0,Ticket Description,Ticket Type
