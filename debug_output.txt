@@ -1,0 +1,22 @@
+Loading models...
+
+Model Inspection:
+--------------------------------------------------
+TFIDF Extractor Type: <class 'src.feature_extraction.FeatureExtractor'>
+Attributes: ['__class__', '__delattr__', '__dict__', '__dir__', '__doc__', '__eq__', '__format__', '__ge__', '__getattribute__', '__getstate__', '__gt__', '__hash__', '__init__', '__init_subclass__', '__le__', '__lt__', '__module__', '__ne__', '__new__', '__reduce__', '__reduce_ex__', '__repr__', '__setattr__', '__setstate__', '__sizeof__', '__sklearn_clone__', '__sklearn_tags__', '__str__', '__subclasshook__', '__weakref__', '_build_request_for_signature', '_doc_link_module', '_doc_link_template', '_doc_link_url_param_generator', '_get_default_requests', '_get_doc_link', '_get_metadata_request', '_get_param_names', '_get_params_html', '_html_repr', '_repr_html_', '_repr_html_inner', '_repr_mimebundle_', '_sklearn_auto_wrap_output_keys', '_validate_params', 'fit', 'fit_transform', 'get_metadata_routing', 'get_params', 'max_features', 'method', 'ngram_range', 'set_output', 'set_params', 'transform', 'vectorizer']
+Has vocabulary_: False
+TFIDF transform output type: <class 'scipy.sparse._csr.csr_matrix'>
+
+BOW Extractor Type: <class 'src.feature_extraction.FeatureExtractor'>
+BOW transform output type: <class 'scipy.sparse._csr.csr_matrix'>
+BOW Shape: (1, 5000)
+
+Category Model Type: <class 'sklearn.svm._classes.SVC'>
+Category Model Steps (if Pipeline): Not a Pipeline
+
+Testing Prediction Flow:
+Features extracted.
+Prediction successful: [3]
+
+Testing Direct Prediction (as if Pipeline):
+Direct Prediction FAILED: could not convert string to float: 'Login page error'

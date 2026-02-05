@@ -6,7 +6,8 @@ from .data_processor import (
     parse_pasted_data,
     validate_ticket_data,
     normalize_ticket_data,
-    add_predictions_to_dataframe
+    add_predictions_to_dataframe,
+    suggest_columns
 )
 from .visualizations import (
     create_bar_chart,
@@ -42,6 +43,7 @@ __all__ = [
     'validate_ticket_data',
     'normalize_ticket_data',
     'add_predictions_to_dataframe',
+    'suggest_columns',
     'create_bar_chart',
     'create_category_bar_chart',
     'create_line_chart',

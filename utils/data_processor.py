@@ -135,9 +135,9 @@ def validate_ticket_data(df):
     return True, None
 
 
-def normalize_ticket_data(df):
+def suggest_columns(df):
     """
-    Normalize column names and extract ticket descriptions.
+    Suggest description and title columns based on content and names.
     
     Parameters:
     -----------
@@ -146,35 +146,87 @@ def normalize_ticket_data(df):
         
     Returns:
     --------
+    dict
+        {'description': col_name, 'title': col_name}
+    """
+    suggestions = {'description': None, 'title': None}
+    
+    # helper to check if col looks like text
+    def is_text_col(col_name):
+        if len(df) == 0: return False
+        # Check first few non-null values
+        sample = df[col_name].dropna().head(5).astype(str)
+        if len(sample) == 0: return False
+        # Check avg length (descriptions are usually longer)
+        avg_len = sample.apply(len).mean()
+        return avg_len > 10
+    
+    columns = df.columns.tolist()
+    
+    # 1. Look for known names for Description
+    desc_keywords = ['description', 'ticket_description', 'text', 'content', 'message', 'issue', 'body', 'details', 'problem', 'complaint']
+    for col in columns:
+        if any(k in col.lower() for k in desc_keywords) and is_text_col(col):
+            suggestions['description'] = col
+            break
+            
+    # 2. If no name match, look for longest text column
+    if not suggestions['description']:
+        text_cols = [c for c in columns if is_text_col(c)]
+        if text_cols:
+            # Pick validation based on avg length
+            lens = {c: df[c].dropna().head(10).astype(str).str.len().mean() for c in text_cols}
+            suggestions['description'] = max(lens, key=lens.get)
+            
+    # 3. Look for known names for Title
+    title_keywords = ['title', 'subject', 'ticket_subject', 'summary', 'header', 'topic']
+    for col in columns:
+        if any(k in col.lower() for k in title_keywords) and col != suggestions['description']:
+            suggestions['title'] = col
+            break
+            
+    return suggestions
+
+
+def normalize_ticket_data(df, text_column=None, title_column=None):
+    """
+    Normalize column names and extract ticket descriptions.
+    
+    Parameters:
+    -----------
+    df : pd.DataFrame
+        Raw ticket data
+    text_column : str, optional
+        Name of the column containing ticket text
+    title_column : str, optional
+        Name of the column containing ticket title
+        
+    Returns:
+    --------
     pd.DataFrame
         Normalized ticket data with standard column names
     """
     df = df.copy()
     
-    # Find description column
-    description_columns = ['description', 'ticket_description', 'text', 'content', 'message', 'issue', 'ticket description']
-    description_col = None
+    # Use specified text column or try to auto-detect
+    if text_column and text_column in df.columns:
+        df['description'] = df[text_column]
+    else:
+        # Fallback to existing logic if simple usage
+        suggestions = suggest_columns(df)
+        if suggestions['description']:
+            df['description'] = df[suggestions['description']]
+        
+    # Use specified title column or try to auto-detect
+    if title_column and title_column in df.columns:
+        df['title'] = df[title_column]
+    else:
+        suggestions = suggest_columns(df)
+        if suggestions['title']:
+            df['title'] = df[suggestions['title']]
     
-    for col in df.columns:
-        if col.lower().strip() in [dc.lower().strip() for dc in description_columns]:
-            description_col = col
-            break
-    
-    if description_col and description_col != 'description':
-        df['description'] = df[description_col]
-    
-    # Find title/subject column if exists
-    title_columns = ['title', 'subject', 'ticket_subject', 'summary', 'ticket subject']
-    title_col = None
-    
-    for col in df.columns:
-        if col.lower().strip() in [tc.lower().strip() for tc in title_columns]:
-            title_col = col
-            break
-    
-    if title_col and title_col != 'title':
-        df['title'] = df[title_col]
-    elif 'description' in df.columns and 'title' not in df.columns:
+    # If still no title but we have description, generate it
+    if 'description' in df.columns and 'title' not in df.columns:
         # Generate title from first 50 chars of description
         df['title'] = df['description'].astype(str).str[:50].str.strip() + '...'
     

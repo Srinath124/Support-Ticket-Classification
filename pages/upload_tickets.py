@@ -13,6 +13,7 @@ from utils import (
     validate_ticket_data,
     normalize_ticket_data,
     add_predictions_to_dataframe,
+    suggest_columns,
     create_category_bar_chart,
     create_pie_chart,
     get_category_color,
@@ -37,6 +38,8 @@ def show():
     # Initialize session state
     if 'processed_tickets' not in st.session_state:
         st.session_state.processed_tickets = None
+    if 'processing_metadata' not in st.session_state:
+        st.session_state.processing_metadata = {}
     
     # Upload method selection with modern styling
     st.markdown("### 📥 Choose Upload Method")
@@ -55,6 +58,17 @@ def show():
         st.markdown("### Upload Your Tickets")
         st.markdown("Supported formats: **CSV**, **JSON**, **Excel** (xlsx, xls)")
         
+        st.info("💡 **Note:** You can upload files with ANY column names. You'll be able to map them in the next step.")
+        
+        with st.expander("ℹ️ File Requirements & Limitations"):
+            st.markdown("""
+            **To ensure successful processing:**
+            *   **Header Row:** The first row must contain column names.
+            *   **Text Column:** Must contain at least one column with ticket descriptions/text.
+            *   **Encoding:** UTF-8 encoding is recommended for CSV files.
+            *   **Structure:** Standard CSV/Excel format with consistent rows.
+            """)
+            
         uploaded_file = st.file_uploader(
             "Drag and drop your file here or click to browse",
             type=['csv', 'json', 'xlsx', 'xls'],
@@ -73,6 +87,8 @@ def show():
     
     else:  # Paste Data
         st.markdown("### Paste Your Ticket Data")
+        
+        st.info("💡 **Note:** You can paste data with any headers. We'll help you map them.")
         
         col1, col2 = st.columns([3, 1])
         
@@ -101,29 +117,66 @@ def show():
     
     # Process uploaded data
     if uploaded_data is not None:
-        st.markdown("---")
-        st.markdown("### 📊 Data Preview")
-        
-        # Validate data
-        is_valid, error_msg = validate_ticket_data(uploaded_data)
-        
-        if not is_valid:
-            st.markdown(error_msg)
-            return
-        
-        # Normalize data
-        normalized_data = normalize_ticket_data(uploaded_data)
-        
-        # Show preview in styled container
         st.markdown(f"""
         <div style="background: #1A1A1A; padding: 1rem; border-radius: 12px; border: 1px solid #2A2A2A; margin-bottom: 1rem;">
             <div style="color: #B0B0B0; font-size: 0.9rem; margin-bottom: 0.5rem;">
-                Showing first 10 rows of {len(normalized_data)} total tickets
+                Showing first 5 rows of uploaded data
             </div>
         </div>
         """, unsafe_allow_html=True)
         
-        st.dataframe(normalized_data.head(10), width='stretch')
+        if not uploaded_data.empty:
+            st.dataframe(uploaded_data.head(5), width='stretch')
+        else:
+            st.warning("⚠️ The uploaded file appears to be empty.")
+            return
+        
+        st.markdown("### 🗺️ Column Mapping")
+        
+        # Get column suggestions
+        suggestions = suggest_columns(uploaded_data)
+        all_columns = uploaded_data.columns.tolist()
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+             # Try to find index of suggested description
+            desc_index = 0
+            if suggestions['description'] in all_columns:
+                desc_index = all_columns.index(suggestions['description'])
+                
+            description_col = st.selectbox(
+                "Select Description Column (Required)",
+                options=all_columns,
+                index=desc_index,
+                help="Select the column containing the main ticket text"
+            )
+            
+        with col2:
+            # Try to find index of suggested title
+            title_index = 0
+            # Default to None/Empty if possible, or try to find a title
+            title_options = ["None (Auto-generate)"] + all_columns
+            
+            default_title_selection = "None (Auto-generate)"
+            if suggestions['title'] in all_columns:
+                default_title_selection = suggestions['title']
+                
+            title_col_selection = st.selectbox(
+                "Select Title Column (Optional)",
+                options=title_options,
+                index=title_options.index(default_title_selection),
+                help="Select a column for ticket title/summary"
+            )
+            
+        title_col = None if title_col_selection == "None (Auto-generate)" else title_col_selection
+        
+        # Normalize data with selected columns
+        normalized_data = normalize_ticket_data(
+            uploaded_data, 
+            text_column=description_col, 
+            title_column=title_col
+        )
         
         st.markdown("<br>", unsafe_allow_html=True)
         
@@ -163,6 +216,15 @@ def show():
                     # Store in session state
                     st.session_state.processed_tickets = results_df
                     
+                    # Store processing metadata
+                    source_name = uploaded_file.name if uploaded_data is not None else "Pasted Data"
+                    st.session_state.processing_metadata = {
+                        'source': source_name,
+                        'description_col': description_col,
+                        'title_col': title_col if title_col else "Auto-generated",
+                        'row_count': len(results_df)
+                    }
+                    
                     progress_bar.empty()
                     status_text.empty()
                     
@@ -176,6 +238,23 @@ def show():
     # Display results if available
     if st.session_state.processed_tickets is not None:
         st.markdown("---")
+        
+        # Processing Summary
+        meta = st.session_state.processing_metadata
+        if meta:
+            st.markdown(f"""
+            <div style="background: #262730; padding: 1.5rem; border-radius: 0.5rem; margin-bottom: 2rem; border-left: 5px solid #ff4b4b;">
+                <h3 style="margin-top: 0">📝 Processing Summary</h3>
+                <p style="margin-bottom: 0.5rem"><strong>📂 Source File:</strong> {meta.get('source', 'Unknown')}</p>
+                <p style="margin-bottom: 0.5rem"><strong>⚙️ Column Mapping:</strong></p>
+                <ul style="margin-top: 0">
+                    <li>Using <code>{meta.get('description_col', 'Unknown')}</code> as Description</li>
+                    <li>Using <code>{meta.get('title_col', 'Auto-generated')}</code> as Title</li>
+                </ul>
+                <p style="margin-bottom: 0"><strong>✅ Status:</strong> Successfully analyzed {meta.get('row_count', 0)} tickets</p>
+            </div>
+            """, unsafe_allow_html=True)
+
         st.markdown("""
         <div style="text-align: center; padding: 1.5rem 0;">
             <h2 style="font-size: 2.5rem;">🎯 Classification Results</h2>
@@ -209,12 +288,14 @@ def show():
         
         with col1:
             st.markdown("### 📊 Predicted Categories")
+            st.caption("Distribution of tickets across different support categories.")
             category_counts = results_df['predicted_category'].value_counts()
             fig = create_category_bar_chart(category_counts)
             st.plotly_chart(fig, width='stretch', key='upload_tickets_chart_1')
         
         with col2:
             st.markdown("### 🎯 Priority Distribution")
+            st.caption("Breakdown of ticket urgency levels (High, Medium, Low).")
             priority_counts = results_df['predicted_priority'].value_counts()
             fig = create_pie_chart(
                 priority_counts.index.tolist(),
